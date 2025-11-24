@@ -1,7 +1,6 @@
 package com.goimaster.service;
 
 import com.goimaster.dto.request.CreateLessonRequest;
-import com.goimaster.model.Group;
 import com.goimaster.model.Lesson;
 import com.goimaster.repository.GroupRepository;
 import com.goimaster.repository.LessonRepository;
@@ -26,9 +25,12 @@ public class LessonService {
         return lessonRepository.findByGroupIdOrderByOrderIndexAsc(groupId);
     }
     
-    public Lesson createLesson(UUID groupId, CreateLessonRequest request) {
+    @Autowired
+    private WordService wordService;
+    
+    public Lesson createLesson(UUID groupId, UUID userId, CreateLessonRequest request) {
         // Verify group exists
-        Group group = groupRepository.findById(groupId)
+        groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
         
         Lesson lesson = new Lesson();
@@ -37,7 +39,17 @@ public class LessonService {
         lesson.setOrderIndex(request.getOrderIndex() != null ? request.getOrderIndex() : 0);
         lesson.setWordCount(0);
         
-        return lessonRepository.save(lesson);
+        Lesson savedLesson = lessonRepository.save(lesson);
+        
+        if (request.getWords() != null && !request.getWords().isEmpty()) {
+            if (userId == null) {
+                throw new IllegalArgumentException("User ID is required when importing words");
+            }
+            int createdCount = wordService.createWords(savedLesson.getId(), userId, request.getWords()).size();
+            savedLesson.setWordCount(createdCount);
+        }
+        
+        return savedLesson;
     }
     
     public Lesson getLessonById(UUID lessonId) {
@@ -60,11 +72,6 @@ public class LessonService {
         lessonRepository.delete(lesson);
     }
     
-    public void updateWordCount(UUID lessonId, int wordCount) {
-        Lesson lesson = getLessonById(lessonId);
-        lesson.setWordCount(wordCount);
-        lessonRepository.save(lesson);
-    }
 }
 
 

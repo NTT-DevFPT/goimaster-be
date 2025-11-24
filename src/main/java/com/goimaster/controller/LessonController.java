@@ -28,8 +28,12 @@ public class LessonController {
     @PostMapping("/groups/{groupId}/lessons")
     public ResponseEntity<Lesson> createLesson(
             @PathVariable UUID groupId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Valid @RequestBody CreateLessonRequest request) {
-        Lesson lesson = lessonService.createLesson(groupId, request);
+        Lesson lesson = lessonService.createLesson(
+                groupId,
+                userId != null ? UUID.fromString(userId) : null,
+                request);
         return ResponseEntity.status(HttpStatus.CREATED).body(lesson);
     }
     

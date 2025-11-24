@@ -9,45 +9,37 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "words")
+@Table(name = "personal_words", uniqueConstraints = @UniqueConstraint(columnNames = { "user_id", "kanji", "furigana",
+        "meaning", "han_viet" }))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Word {
+public class PersonalWord {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "lesson_id", nullable = false)
-    private UUID lessonId;
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
     @Column(nullable = false)
     private String kanji;
 
     @Column(name = "han_viet", nullable = false)
-    private String hanViet; // Can be empty string but not null
+    private String hanViet;
 
     @Column(nullable = false)
     private String furigana;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String meaning;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    @Column(name = "added_at")
+    private LocalDateTime addedAt;
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        addedAt = LocalDateTime.now();
     }
 }

@@ -16,24 +16,26 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api")
 public class WordController {
-    
+
     @Autowired
     private WordService wordService;
-    
+
     @GetMapping("/lessons/{lessonId}/words")
     public ResponseEntity<List<Word>> getWords(@PathVariable UUID lessonId) {
         List<Word> words = wordService.getWordsByLessonId(lessonId);
         return ResponseEntity.ok(words);
     }
-    
+
     @PostMapping("/lessons/{lessonId}/words")
     public ResponseEntity<List<Word>> createWords(
             @PathVariable UUID lessonId,
+            @RequestHeader("X-User-Id") String userId,
             @Valid @RequestBody BatchCreateWordsRequest request) {
-        List<Word> words = wordService.createWords(lessonId, request);
+        UUID userUuid = UUID.fromString(userId);
+        List<Word> words = wordService.createWords(lessonId, userUuid, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(words);
     }
-    
+
     @PutMapping("/words/{id}")
     public ResponseEntity<Word> updateWord(
             @PathVariable UUID id,
@@ -41,12 +43,10 @@ public class WordController {
         Word word = wordService.updateWord(id, request);
         return ResponseEntity.ok(word);
     }
-    
+
     @DeleteMapping("/words/{id}")
     public ResponseEntity<Void> deleteWord(@PathVariable UUID id) {
         wordService.deleteWord(id);
         return ResponseEntity.noContent().build();
     }
 }
-
-

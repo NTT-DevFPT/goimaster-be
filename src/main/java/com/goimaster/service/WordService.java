@@ -17,25 +17,28 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class WordService {
-    
+
     @Autowired
     private WordRepository wordRepository;
-    
+
     @Autowired
     private LessonRepository lessonRepository;
-    
+
     @Autowired
-    private LessonService lessonService;
-    
+    private GlobalWordService globalWordService;
+
+    @Autowired
+    private PersonalWordService personalWordService;
+
     public List<Word> getWordsByLessonId(UUID lessonId) {
         return wordRepository.findByLessonIdOrderByCreatedAtAsc(lessonId);
     }
-    
-    public List<Word> createWords(UUID lessonId, BatchCreateWordsRequest request) {
+
+    public List<Word> createWords(UUID lessonId, UUID userId, BatchCreateWordsRequest request) {
         // Verify lesson exists
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new IllegalArgumentException("Lesson not found"));
-        
+
         List<Word> words = request.getWords().stream()
                 .map(wordRequest -> {
                     Word word = new Word();
@@ -47,39 +50,63 @@ public class WordService {
                     return word;
                 })
                 .collect(Collectors.toList());
-        
+
         List<Word> savedWords = wordRepository.saveAll(words);
-        
+
+        // Add to BOTH vocabularies ASYNCHRONOUSLY (non-blocking for speed)
+        // This runs in the background and doesn't slow down the response
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            for (Word word : savedWords) {
+                try {
+                    // Add to user's personal vocabulary
+                    personalWordService.findOrCreatePersonalWord(userId, word);
+                    // Add to global vocabulary (admin can see all)
+                    globalWordService.findOrCreateGlobalWord(word);
+                } catch (Exception e) {
+                    // Log error but don't fail the request
+                    System.err.println("Failed to add word to vocabularies: " + e.getMessage());
+                }
+            }
+        });
+
         // Update lesson word count
         long totalWordCount = wordRepository.countByLessonId(lessonId);
-        lessonService.updateWordCount(lessonId, (int) totalWordCount);
-        
+        lesson.setWordCount((int) totalWordCount);
+        lessonRepository.save(lesson);
+
         return savedWords;
     }
-    
+
+    public List<Word> createWords(UUID lessonId, UUID userId, List<CreateWordRequest> wordRequests) {
+        BatchCreateWordsRequest request = new BatchCreateWordsRequest();
+        request.setWords(wordRequests);
+        return createWords(lessonId, userId, request);
+    }
+
     public Word updateWord(UUID wordId, CreateWordRequest request) {
         Word word = wordRepository.findById(wordId)
                 .orElseThrow(() -> new IllegalArgumentException("Word not found"));
-        
+
         word.setKanji(request.getKanji());
         word.setHanViet(request.getHanViet());
         word.setFurigana(request.getFurigana());
         word.setMeaning(request.getMeaning());
-        
+
         return wordRepository.save(word);
     }
-    
+
     public void deleteWord(UUID wordId) {
         Word word = wordRepository.findById(wordId)
                 .orElseThrow(() -> new IllegalArgumentException("Word not found"));
-        
+
         UUID lessonId = word.getLessonId();
         wordRepository.delete(word);
-        
+
         // Update lesson word count
         long totalWordCount = wordRepository.countByLessonId(lessonId);
-        lessonService.updateWordCount(lessonId, (int) totalWordCount);
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new IllegalArgumentException("Lesson not found"));
+        lesson.setWordCount((int) totalWordCount);
+        lessonRepository.save(lesson);
     }
 }
-
-

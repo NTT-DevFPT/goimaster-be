@@ -6,44 +6,49 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
-@Table(name = "words")
+@Table(name = "global_words")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Word {
+public class GlobalWord {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "lesson_id", nullable = false)
-    private UUID lessonId;
-
     @Column(nullable = false)
     private String kanji;
 
     @Column(name = "han_viet", nullable = false)
-    private String hanViet; // Can be empty string but not null
+    private String hanViet;
 
     @Column(nullable = false)
     private String furigana;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String meaning;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "first_added_at")
+    private LocalDateTime firstAddedAt;
+
+    @Column(name = "added_count")
+    private Integer addedCount = 0;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        firstAddedAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (addedCount == null) {
+            addedCount = 1;
+        }
     }
 
     @PreUpdate
