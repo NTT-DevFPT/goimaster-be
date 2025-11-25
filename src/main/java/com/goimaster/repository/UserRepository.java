@@ -12,12 +12,12 @@ import java.util.UUID;
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
     
-    Optional<User> findByEmail(String email);
+    Optional<User> findByEmailIgnoreCase(String email);
     
-    @Query("SELECT u FROM User u WHERE u.email = :email AND u.deletedAt IS NULL")
+    @Query("SELECT u FROM User u WHERE LOWER(u.email) = LOWER(:email) AND u.deletedAt IS NULL")
     Optional<User> findByEmailAndNotDeleted(@Param("email") String email);
     
-    @Query("SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM User u WHERE u.email = :email AND u.deletedAt IS NULL")
+    @Query("SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM User u WHERE LOWER(u.email) = LOWER(:email) AND u.deletedAt IS NULL")
     boolean existsByEmailAndNotDeleted(@Param("email") String email);
     
     @Query("SELECT u FROM User u WHERE u.id = :id AND u.deletedAt IS NULL")

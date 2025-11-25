@@ -91,12 +91,22 @@ public class AuthController {
             return ResponseEntity.ok(response);
             
         } catch (AuthenticationException e) {
-            response.put("error", "LOGIN_FAILED");
-            response.put("message", e.getMessage());
+            String errorCode = e.getMessage();
+            response.put("error", errorCode);
+            
+            String friendlyMessage;
+            switch (errorCode) {
+                case "EMAIL_NOT_FOUND" -> friendlyMessage = "Email không tồn tại. Vui lòng đăng ký.";
+                case "INVALID_PASSWORD" -> friendlyMessage = "Mật khẩu không chính xác.";
+                default -> friendlyMessage = "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.";
+            }
+            response.put("message", friendlyMessage);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         } catch (UserNotFoundException e) {
-            response.put("error", "USER_NOT_FOUND");
-            response.put("message", e.getMessage());
+            String errorCode = e.getMessage();
+            response.put("error", errorCode);
+            String friendlyMessage = "Tài khoản không tồn tại hoặc đã bị xóa.";
+            response.put("message", friendlyMessage);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
         } catch (Exception e) {
             logger.error("Login error: {}", e.getMessage(), e);

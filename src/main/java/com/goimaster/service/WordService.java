@@ -43,8 +43,8 @@ public class WordService {
                 .map(wordRequest -> {
                     Word word = new Word();
                     word.setLessonId(lessonId);
-                    word.setKanji(wordRequest.getKanji());
-                    word.setHanViet(wordRequest.getHanViet());
+                    word.setKanji(wordRequest.getKanji() != null ? wordRequest.getKanji().trim() : null);
+                    word.setHanViet(wordRequest.getHanViet() != null ? wordRequest.getHanViet().trim() : "");
                     word.setFurigana(wordRequest.getFurigana());
                     word.setMeaning(wordRequest.getMeaning());
                     return word;
@@ -61,7 +61,7 @@ public class WordService {
                 // Add to user's personal vocabulary (rà soát duplicate theo user)
                 personalWordService.findOrCreatePersonalWord(userId, word);
                 
-                // Add to global vocabulary (rà soát duplicate toàn hệ thống)
+                // Add to global vocabulary (rà soát duplicate toàn hệ thống) - cho phép từ không có Kanji
                 // Nếu từ đã có, chỉ tăng counter, không tạo duplicate
                 globalWordService.findOrCreateGlobalWord(word);
             } catch (Exception e) {

@@ -6,10 +6,8 @@ import lombok.Data;
 
 @Data
 public class CreateWordRequest {
-    @NotBlank(message = "Kanji is required")
     private String kanji;
 
-    @NotNull(message = "Han Viet cannot be null")
     private String hanViet;
 
     @NotBlank(message = "Furigana is required")

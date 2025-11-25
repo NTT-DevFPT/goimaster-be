@@ -35,13 +35,14 @@ public class AuthService {
     @Transactional
     public Map<String, Object> register(String name, String email, String password) {
         // Check if email already exists
-        if (userRepository.existsByEmailAndNotDeleted(email)) {
+        String normalizedEmail = email.toLowerCase().trim();
+        if (userRepository.existsByEmailAndNotDeleted(normalizedEmail)) {
             throw new AuthenticationException("Email already registered");
         }
         
         // Create new user
         User user = new User();
-        user.setEmail(email.toLowerCase().trim());
+        user.setEmail(normalizedEmail);
         user.setPassword(passwordEncoder.encode(password));
         user.setName(name.trim());
         user.setEmailVerified(false);
@@ -64,19 +65,21 @@ public class AuthService {
      * Login user
      */
     public Map<String, Object> login(String email, String password) {
-        User user = userRepository.findByEmailAndNotDeleted(email.toLowerCase().trim())
-                .orElseThrow(() -> new AuthenticationException("Invalid email or password"));
+        String normalizedEmail = email.toLowerCase().trim();
+        
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
+                .orElseThrow(() -> new AuthenticationException("EMAIL_NOT_FOUND"));
+        
+        if (user.isDeleted()) {
+            throw new UserNotFoundException("USER_DELETED");
+        }
         
         // Verify password
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new AuthenticationException("Invalid email or password");
+            throw new AuthenticationException("INVALID_PASSWORD");
         }
         
         // Check if user is deleted
-        if (user.isDeleted()) {
-            throw new UserNotFoundException("User account has been deleted");
-        }
-        
         logger.info("User logged in: {}", user.getEmail());
         
         // Generate JWT token
