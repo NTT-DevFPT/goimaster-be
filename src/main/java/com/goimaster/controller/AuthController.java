@@ -1,9 +1,13 @@
 package com.goimaster.controller;
 
+import com.goimaster.dto.request.LoginRequest;
+import com.goimaster.dto.request.RegisterRequest;
 import com.goimaster.exception.AuthenticationException;
 import com.goimaster.exception.UserNotFoundException;
-import com.goimaster.service.AuthenticationService;
+import com.goimaster.model.User;
+import com.goimaster.service.AuthService;
 import com.goimaster.service.UserVerificationService;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,8 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Controller for authentication verification
- * Frontend can call this to verify if current user session is still valid
+ * Controller for authentication
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -26,59 +29,126 @@ public class AuthController {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     
     @Autowired
-    private AuthenticationService authenticationService;
+    private AuthService authService;
     
     @Autowired
     private UserVerificationService userVerificationService;
     
     /**
+     * Register a new user
+     */
+    @PostMapping("/register")
+    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest request) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            var result = authService.register(request.getName(), request.getEmail(), request.getPassword());
+            
+            User user = (User) result.get("user");
+            response.put("user", Map.of(
+                "id", user.getId().toString(),
+                "email", user.getEmail(),
+                "name", user.getName()
+            ));
+            response.put("token", result.get("token"));
+            response.put("message", "Registration successful");
+            
+            logger.info("User registered: {}", user.getEmail());
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            
+        } catch (AuthenticationException e) {
+            response.put("error", "REGISTRATION_FAILED");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            logger.error("Registration error: {}", e.getMessage(), e);
+            response.put("error", "INTERNAL_ERROR");
+            response.put("message", "An unexpected error occurred");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+    
+    /**
+     * Login user
+     */
+    @PostMapping("/login")
+    public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            var result = authService.login(request.getEmail(), request.getPassword());
+            
+            User user = (User) result.get("user");
+            response.put("user", Map.of(
+                "id", user.getId().toString(),
+                "email", user.getEmail(),
+                "name", user.getName()
+            ));
+            response.put("token", result.get("token"));
+            response.put("message", "Login successful");
+            
+            logger.info("User logged in: {}", user.getEmail());
+            return ResponseEntity.ok(response);
+            
+        } catch (AuthenticationException e) {
+            response.put("error", "LOGIN_FAILED");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        } catch (UserNotFoundException e) {
+            response.put("error", "USER_NOT_FOUND");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        } catch (Exception e) {
+            logger.error("Login error: {}", e.getMessage(), e);
+            response.put("error", "INTERNAL_ERROR");
+            response.put("message", "An unexpected error occurred");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+    
+    /**
      * Verify if current user session is valid and user still exists
-     * Frontend should call this on app load to ensure user hasn't been deleted
      */
     @GetMapping("/verify")
     public ResponseEntity<Map<String, Object>> verifyUser(
-            @RequestHeader(value = "Authorization", required = false) String authHeader,
-            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader) {
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
         
         Map<String, Object> response = new HashMap<>();
         
         try {
-            // Verify user exists and token is valid
-            UUID userId = authenticationService.verifyAndGetUserId(authHeader, userIdHeader);
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                throw new AuthenticationException("Authorization header is required");
+            }
+            
+            String token = authHeader.substring(7);
+            User user = authService.verifyToken(token);
             
             response.put("valid", true);
-            response.put("userId", userId.toString());
+            response.put("userId", user.getId().toString());
             response.put("message", "User session is valid");
             
-            logger.info("User {} verified successfully", userId);
-            
+            logger.info("User {} verified successfully", user.getId());
             return ResponseEntity.ok(response);
             
         } catch (UserNotFoundException e) {
             logger.error("User verification failed - user not found: {}", e.getMessage());
-            
             response.put("valid", false);
             response.put("error", "USER_NOT_FOUND");
             response.put("message", "User account does not exist or has been deleted");
-            
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
             
         } catch (AuthenticationException e) {
             logger.error("User verification failed - authentication error: {}", e.getMessage());
-            
             response.put("valid", false);
             response.put("error", "AUTHENTICATION_FAILED");
             response.put("message", "Invalid or expired token");
-            
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
             
         } catch (Exception e) {
             logger.error("Unexpected error during user verification: {}", e.getMessage(), e);
-            
             response.put("valid", false);
             response.put("error", "INTERNAL_ERROR");
             response.put("message", "An unexpected error occurred");
-            
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }

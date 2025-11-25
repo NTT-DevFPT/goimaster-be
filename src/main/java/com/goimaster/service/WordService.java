@@ -53,21 +53,24 @@ public class WordService {
 
         List<Word> savedWords = wordRepository.saveAll(words);
 
-        // Add to BOTH vocabularies ASYNCHRONOUSLY (non-blocking for speed)
-        // This runs in the background and doesn't slow down the response
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
-            for (Word word : savedWords) {
-                try {
-                    // Add to user's personal vocabulary
-                    personalWordService.findOrCreatePersonalWord(userId, word);
-                    // Add to global vocabulary (admin can see all)
-                    globalWordService.findOrCreateGlobalWord(word);
-                } catch (Exception e) {
-                    // Log error but don't fail the request
-                    System.err.println("Failed to add word to vocabularies: " + e.getMessage());
-                }
+        // Add to BOTH vocabularies with duplicate checking
+        // 1. Personal vocabulary (user-specific) - checks for duplicates per user
+        // 2. Global vocabulary (system-wide) - checks for duplicates across all users
+        for (Word word : savedWords) {
+            try {
+                // Add to user's personal vocabulary (rà soát duplicate theo user)
+                personalWordService.findOrCreatePersonalWord(userId, word);
+                
+                // Add to global vocabulary (rà soát duplicate toàn hệ thống)
+                // Nếu từ đã có, chỉ tăng counter, không tạo duplicate
+                globalWordService.findOrCreateGlobalWord(word);
+            } catch (Exception e) {
+                // Log error but don't fail the request
+                // Nếu có lỗi khi add vào vocab, vẫn giữ words trong lesson
+                System.err.println("Failed to add word to vocabularies: " + e.getMessage());
+                e.printStackTrace();
             }
-        });
+        }
 
         // Update lesson word count
         long totalWordCount = wordRepository.countByLessonId(lessonId);
